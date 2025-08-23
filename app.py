@@ -1,4 +1,5 @@
 
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -113,53 +114,90 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-weather_json = {
-    "2025-08-22": {"holiday":0,"workingday":1,"weathersit":2,"temp":0.6,"atemp":0.62,"hum":0.45,"windspeed":0.1},
-    "2025-08-23": {"holiday":0,"workingday":1,"weathersit":1,"temp":0.5,"atemp":0.52,"hum":0.4,"windspeed":0.1},
-    # Add more dates as needed
-}
 
-# User input
+
+import requests
+from datetime import datetime
+
+# Your OpenWeatherMap API key
+API_KEY = "ab1056fdedb4cbd6ae166c372fcb27c4"
+CITY = "Bangalore"  # change city as needed
+
+def get_weather(city):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric"
+    response = requests.get(url).json()
+
+    # Check for successful API call
+    if response.get("cod") != 200:
+        print(f"Error fetching weather data: {response.get('message', 'Unknown error')}")
+        return None
+
+    try:
+        # Extract required fields
+        temp = response['main']['temp'] / 41  # normalize like dataset (max ~41C)
+        atemp = temp  # approximation (dataset used 'feels like')
+        hum = response['main']['humidity'] / 100
+        windspeed = response['wind']['speed'] / 67  # dataset max ~67
+        weather_id = response['weather'][0]['id']
+
+        # Map OpenWeatherMap weather_id → dataset's weathersit
+        if weather_id < 600:
+            weathersit = 3  # Rain
+        elif weather_id < 700:
+            weathersit = 2  # Mist
+        elif weather_id < 800:
+            weathersit = 3
+        elif weather_id == 800:
+            weathersit = 1  # Clear
+        else:
+            weathersit = 2  # Clouds
+
+        return {
+            "holiday": 0,
+            "workingday": 1,
+            "weathersit": weathersit,
+            "temp": temp,
+            "atemp": atemp,
+            "hum": hum,
+            "windspeed": windspeed
+        }
+    except KeyError as e:
+        print(f"Error processing weather data: Missing key {e}")
+        return None
+
+# Ask user
 date_input = input("Enter date to predict bike rentals (YYYY-MM-DD): ")
-try:
-    date_obj = datetime.strptime(date_input, "%Y-%m-%d")
-except:
-    print("Invalid date format!")
-    exit()
+date_obj = datetime.strptime(date_input, "%Y-%m-%d")
 
-# Extract features
-mnth = date_obj.month
-weekday = date_obj.weekday()
-yr = date_obj.year - 2011
-day = date_obj.day
-year = date_obj.year
+weather_data = get_weather(CITY)  # fetch live weather
 
-# Season mapping
-if mnth in [12,1,2]:
-    season=4
-elif mnth in [3,4,5]:
-    season=1
-elif mnth in [6,7,8]:
-    season=2
+if weather_data:
+    mnth = date_obj.month
+    weekday = date_obj.weekday()
+    yr = date_obj.year - 2011
+    day = date_obj.day
+    year = date_obj.year
+
+    # Season mapping
+    if mnth in [12,1,2]:
+        season=4
+    elif mnth in [3,4,5]:
+        season=1
+    elif mnth in [6,7,8]:
+        season=2
+    else:
+        season=3
+
+    # Prepare input
+    input_data = np.array([[season, yr, mnth, weather_data["holiday"], weekday,
+                            weather_data["workingday"], weather_data["weathersit"],
+                            weather_data["temp"], weather_data["atemp"], weather_data["hum"],
+                            weather_data["windspeed"], year, mnth, day]])
+
+    input_scaled = scaler_X.transform(input_data)
+    predicted_scaled = model.predict(input_scaled)
+    predicted_count = scaler_y.inverse_transform(predicted_scaled)
+
+    print(f"\nPredicted bike rentals for {CITY} on {date_input}: {int(predicted_count[0][0])}")
 else:
-    season=3
-
-# Fetch weather
-if date_input in weather_json:
-    w = weather_json[date_input]
-else:
-    print("Weather data not available for this date!")
-    exit()
-
-# Prepare input array
-input_data = np.array([[season, yr, mnth, w["holiday"], weekday,
-                        w["workingday"], w["weathersit"],
-                        w["temp"], w["atemp"], w["hum"], w["windspeed"],
-                        year, mnth, day]])
-
-# Scale and predict
-input_scaled = scaler_X.transform(input_data)
-predicted_scaled = model.predict(input_scaled)
-predicted_count = scaler_y.inverse_transform(predicted_scaled)
-
-print(f"\nPredicted bike rentals for {date_input}: {int(predicted_count[0][0])}")
+    print("Could not predict bike rentals due to weather data fetching error.")

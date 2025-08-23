@@ -1,5 +1,4 @@
 
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +12,6 @@ from tensorflow.keras.layers import Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from datetime import datetime
 import json
-
 import requests, zipfile, io
 
 url = 'https://archive.ics.uci.edu/ml/machine-learning-databases/00275/Bike-Sharing-Dataset.zip'
@@ -114,11 +112,6 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-
-
-import requests
-from datetime import datetime
-
 # Your OpenWeatherMap API key
 API_KEY = "YOUR_API_KEY"
 CITY = "Bangalore"  # change city as needed
@@ -165,6 +158,7 @@ def get_weather(city):
         print(f"Error processing weather data: Missing key {e}")
         return None
 
+
 # Ask user
 date_input = input("Enter date to predict bike rentals (YYYY-MM-DD): ")
 date_obj = datetime.strptime(date_input, "%Y-%m-%d")
@@ -179,25 +173,29 @@ if weather_data:
     year = date_obj.year
 
     # Season mapping
-    if mnth in [12,1,2]:
-        season=4
-    elif mnth in [3,4,5]:
-        season=1
-    elif mnth in [6,7,8]:
-        season=2
+    if mnth in [12, 1, 2]:
+        season = 4
+    elif mnth in [3, 4, 5]:
+        season = 1
+    elif mnth in [6, 7, 8]:
+        season = 2
     else:
-        season=3
+        season = 3
 
-    # Prepare input
-    input_data = np.array([[season, yr, mnth, weather_data["holiday"], weekday,
-                            weather_data["workingday"], weather_data["weathersit"],
-                            weather_data["temp"], weather_data["atemp"], weather_data["hum"],
-                            weather_data["windspeed"], year, mnth, day]])
+    # Prepare input (as DataFrame to keep feature names)
+    input_data = [[season, yr, mnth, weather_data["holiday"], weekday,
+                   weather_data["workingday"], weather_data["weathersit"],
+                   weather_data["temp"], weather_data["atemp"], weather_data["hum"],
+                   weather_data["windspeed"], year, mnth, day]]
 
-    input_scaled = scaler_X.transform(input_data)
+    input_df = pd.DataFrame(input_data, columns=X.columns)
+
+    # Scale and predict
+    input_scaled = scaler_X.transform(input_df)
     predicted_scaled = model.predict(input_scaled)
     predicted_count = scaler_y.inverse_transform(predicted_scaled)
 
     print(f"\nPredicted bike rentals for {CITY} on {date_input}: {int(predicted_count[0][0])}")
+
 else:
     print("Could not predict bike rentals due to weather data fetching error.")
